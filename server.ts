@@ -402,7 +402,7 @@ Si vous recevez un message suspect sur WhatsApp, Facebook ou ailleurs au Bénin 
       query.includes("mes signalements") ||
       query.includes("mes alertes")
     ) {
-      if (!ctx.userProfile) {
+      if (!ctx?.userProfile) {
         return "Vous n'êtes pas connecté. Veuillez vous connecter pour voir vos informations et signalements.";
       }
       return `👤 **Mon Profil ActuHub**
@@ -413,13 +413,53 @@ Rôle : ${ctx.userProfile.role || 'Citoyen'}
 Vous avez contribué à la lutte contre la désinformation !`;
     }
 
+    // Sort raw articles strictly by publication date descending (newest first)
+    const sortedArticles = [...rawArticles].sort((a: any, b: any) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());
+
+    // Detect if user is asking for general news / 10 recent articles
+    const isExplicitNewsRequest = 
+      query.includes("actualité") || 
+      query.includes("actualite") || 
+      query.includes("actu") || 
+      query.includes("nouvelle") || 
+      query.includes("dernière") || 
+      query.includes("derniere") || 
+      query.includes("récente") || 
+      query.includes("recente") || 
+      query.includes("article") || 
+      query.includes("presse") || 
+      query.includes("10 article") || 
+      query.includes("10 récents") || 
+      query.includes("10 recents") || 
+      query.includes("quoi de neuf") || 
+      query.includes("fil info") ||
+      query.includes("titre");
+
+    const isRumorQuery = query.includes("rumeur") || query.includes("fake") || query.includes("intox") || query.includes("mensonge") || query.includes("tromp") || query.includes("verif");
+
+    // If user explicitly asks for recent news / actualités without a rumor filter
+    if (isExplicitNewsRequest && !isRumorQuery) {
+      const top10 = sortedArticles.slice(0, 10);
+      if (top10.length > 0) {
+        const items = top10.map((a: any, idx: number) => {
+          let dateStr = '';
+          if (a.pubDate) {
+            const d = new Date(a.pubDate);
+            dateStr = ` • ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+          }
+          const desc = a.description ? a.description.replace(/<[^>]*>?/gm, '').trim().substring(0, 140) : '';
+          return `${idx + 1}. **${a.title}**\n   *Source :* ${a.source || 'Presse Béninoise'}${dateStr}\n   ${desc ? `${desc}...` : ''}`;
+        }).join('\n\n');
+
+        return `📰 **Voici les ${top10.length} articles les plus récents disponibles sur ActuHub Bénin :**\n\n${items}\n\n💡 *Vous pouvez consulter tous les articles complets en direct dans l'onglet **Actualités** de la plateforme !*`;
+      }
+    }
+
     // Extract search tokens for smart local relevance matching
     const queryTokens = query
       .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
       .split(/\s+/)
       .filter((token: string) => token.length > 2); // only consider keywords > 2 chars
-
-    const isRumorQuery = query.includes("rumeur") || query.includes("fake") || query.includes("intox") || query.includes("mensonge") || query.includes("tromp") || query.includes("verif");
 
     // Score and select relevant rumors
     let matchedRumors: any[] = [];
@@ -447,7 +487,7 @@ Vous avez contribué à la lutte contre la désinformation !`;
     // Score and select relevant articles
     let matchedArticles: any[] = [];
     if (queryTokens.length > 0) {
-      const scoredArticles = rawArticles.map((a: any) => {
+      const scoredArticles = sortedArticles.map((a: any) => {
         let score = 0;
         const searchArea = `${a.title || ''} ${a.source || ''} ${a.description || ''} ${a.category || ''}`.toLowerCase();
         queryTokens.forEach((token: string) => {
@@ -509,24 +549,32 @@ Aucun signalement de rumeur n'est disponible sur la plateforme pour le moment. V
       }
 
       if (matchedArticles.length > 0) {
-        result += `📰 **Articles de Presse récents (${matchedArticles.length})** :\n`;
-        result += matchedArticles.slice(0, 3).map((a: any) => {
+        const topMatched = matchedArticles.slice(0, 10);
+        result += `📰 **Articles de Presse correspondants (${topMatched.length})** :\n`;
+        result += topMatched.map((a: any, idx: number) => {
           const dateStr = a.pubDate ? ` (${new Date(a.pubDate).toLocaleDateString('fr-FR')})` : '';
-          return `• **${a.title}**${dateStr} - *Source: ${a.source}*\n  ${a.description ? `${a.description.substring(0, 100)}...` : ''}`;
-        }).join('\n') + '\n\n';
+          return `${idx + 1}. **${a.title}**${dateStr} - *Source: ${a.source || 'Presse'}*\n  ${a.description ? `${a.description.substring(0, 100)}...` : ''}`;
+        }).join('\n\n') + '\n\n';
       }
 
       result += `💡 Conseil : Tapez d'autres mots-clés (ex: "santé", "cotonou", "désinformation") pour filtrer nos bases de données !`;
       return result;
     }
 
-    // 5. Default fallback
-    const recentArticles = rawArticles.slice(0, 2);
+    // 5. Default fallback (top 10 recent articles)
+    const recentArticles = sortedArticles.slice(0, 10);
     const recentRumors = rawRumors.slice(0, 2);
 
-    let fallbackResponse = `🔍 Je n'ai pas trouvé de correspondance exacte pour votre recherche "${msg}".
+    let fallbackResponse = `🔍 Je n'ai pas trouvé de mot-clé spécifique pour votre recherche "${msg}".
 
-Voici néanmoins les dernières activités en direct de la plateforme d'actualités :`;
+Voici les **10 articles d'actualité les plus récents** disponibles sur ActuHub Bénin :`;
+
+    if (recentArticles.length > 0) {
+      fallbackResponse += '\n\n' + recentArticles.map((a: any, idx: number) => {
+        const dateStr = a.pubDate ? ` • ${new Date(a.pubDate).toLocaleDateString('fr-FR')}` : '';
+        return `${idx + 1}. **${a.title}** (*Source: ${a.source}*${dateStr})`;
+      }).join('\n');
+    }
 
     if (recentRumors.length > 0) {
       fallbackResponse += `\n\n🚨 **Rumeur récente signalée** :
@@ -534,15 +582,9 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
   Verdict : ${recentRumors[0].status === 'fake' ? '❌ Faux' : recentRumors[0].status === 'verified' ? '✅ Vrai' : '⚠️ Trompeur'} - ${recentRumors[0].explanation || 'Analyse en cours.'}`;
     }
 
-    if (recentArticles.length > 0) {
-      fallbackResponse += `\n\n📰 **Actualité récente** :
-• **${recentArticles[0].title}** (Source: ${recentArticles[0].source})`;
-    }
-
     fallbackResponse += `\n\n💡 *Astuces* :
-- Demandez les "dernières rumeurs" ou "dernières actualités"
-- Tapez "désinformation", "fact checking" ou "médias" pour obtenir des guides d'éducation civique complets.
-- Écrivez "aide" pour réinitialiser les options de discussion.`;
+- Consultez l'onglet **Actualités** pour parcourir tous les articles complets.
+- Tapez "désinformation", "fact checking" ou "médias" pour obtenir des guides complets.`;
 
     return fallbackResponse;
   };
@@ -634,8 +676,8 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
 
       let articlesList: any[] = [];
       if (isGeneralNewsQuery && queryTokens.length === 0) {
-        // If user asks for general recent news, take top 6 freshest news directly
-        articlesList = rawArticles.slice(0, 6);
+        // If user asks for general recent news, take top 10 freshest news directly
+        articlesList = rawArticles.slice(0, 10);
       } else if (queryTokens.length > 0) {
         const scoredArticles = rawArticles.map((a: any) => {
           let score = 0;
@@ -661,12 +703,12 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
           .map((item: any) => item.article);
 
         if (matched.length > 0) {
-          articlesList = matched.slice(0, 6);
+          articlesList = matched.slice(0, 10);
         } else {
-          articlesList = rawArticles.slice(0, 6);
+          articlesList = rawArticles.slice(0, 10);
         }
       } else {
-        articlesList = rawArticles.slice(0, 6);
+        articlesList = rawArticles.slice(0, 10);
       }
 
       // Score and select relevant rumors
@@ -702,7 +744,7 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
       }
 
       // Format articles and rumors context for the AI prompt
-      const articlesCtx = articlesList.map((a: any) => {
+      const articlesCtx = articlesList.map((a: any, idx: number) => {
         let dateLabel = 'Inconnue';
         if (a.pubDate) {
           const d = new Date(a.pubDate);
@@ -718,7 +760,7 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
             dateLabel = `Publié le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
           }
         }
-        return `- [ARTICLE TRÈS RÉCENT] Titre: "${a.title}" | Source: ${a.source || 'Presse Béninoise'} | Horodatage: ${dateLabel} | Catégorie: ${a.category || 'Général'} | Résumé: ${a.description || ''}`;
+        return `[ARTICLE #${idx + 1}] Titre: "${a.title}" | Source: ${a.source || 'Presse Béninoise'} | Horodatage: ${dateLabel} | Catégorie: ${a.category || 'Général'} | Résumé: ${a.description || ''}`;
       }).join('\n');
 
       const rumorsCtx = rumorsList.map((r: any) => {
@@ -735,6 +777,18 @@ Voici néanmoins les dernières activités en direct de la plateforme d'actualit
 Tu as un accès total aux informations de la plateforme ActuHub Bénin en temps réel, y compris les flux de presse (RSS) et les rumeurs vérifiées.
 
 Tu peux aussi aider l'utilisateur à consulter ses propres informations, comme son profil ou ses signalements en cours (s'il est connecté).
+
+=== RÈGLE ABSOLUE POUR LES DEMANDES D'ACTUALITÉS ===
+Lorsque l'utilisateur demande les actualités, les dernières nouvelles, le fil d'actualité, quoi de neuf, ou demande les 10 récents articles :
+Tu DOIS OBLIGATOIREMENT présenter les 10 articles les plus récents listés dans "FLUX DE PRESSE ET ARTICLES RSS RÉCENTS" ci-dessous (ou l'intégralité disponible s'il y en a moins de 10).
+Présente-les sous la forme d'une liste numérotée claire de 1 à 10 :
+1. **[Titre de l'article]**
+   - *Source :* [Nom du média source] • *Date/Heure :* [Horodatage]
+   - *Résumé :* [Court résumé explicatif de 1 à 2 phrases]
+2. ...
+(jusqu'au 10ème article)
+
+Termine toujours ta réponse par un message invitant à explorer l'onglet **Actualités** de la plateforme pour lire les articles complets en continu.
 
 === REPERTOIRE DE CONNAISSANCES LOCALES STRATEGIQUES ===
 
