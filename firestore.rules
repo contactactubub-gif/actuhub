@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net: deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'contactactubub@gmail.com' ||
+        request.auth.uid == 'owyDPUYAQvdp9KYyymS1XhEsyVg1' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'admin')
+      );
+    }
+
+    function isMedia() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'media')
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // --- Rumeurs Collection ---
+    match /rumeurs/{reportId} {
+      allow read, write: if true;
+    }
+
+    // --- Lessons Collection ---
+    match /lessons/{lessonId} {
+      allow read, write: if true;
+    }
+
+    // --- Submissions Collection ---
+    match /submissions/{submissionId} {
+      allow read, write: if true;
+    }
+
+    // --- Communiques Collection ---
+    match /communiques/{communiqueId} {
+      allow read, write: if true;
+    }
+
+    // --- Advertisements Collection ---
+    match /advertisements/{adId} {
+      allow read, write: if true;
+    }
+
+    // --- Frontpages Collection ---
+    match /frontpages/{frontpageId} {
+      allow read, write: if true;
+    }
+
+    // --- Newsletter Subscriptions Collection ---
+    match /newsletter_subscriptions/{subscriptionId} {
+      allow read, write: if true;
+    }
+
+    // --- Shorts Collection ---
+    match /shorts/{shortId} {
+      allow read, write: if true;
+    }
+  }
+}

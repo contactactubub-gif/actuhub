@@ -1,0 +1,6 @@
+{
+  "name": "ACTUHUB",
+  "description": "Plateforme béninoise de vérification de faits, lutte contre la désinformation et analyse forensique d'images (ACTUHUB Image Check).",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

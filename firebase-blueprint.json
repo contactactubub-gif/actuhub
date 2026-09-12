@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile in the application containing roles and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["simple", "media", "admin"] },
+        "mediaName": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "registrationDate": { "type": "string" },
+        "favorites": {
+          "type": "array",
+          "description": "Array of favorite article or rumor IDs for multi-device sync"
+        },
+        "isGoogleUser": { "type": "boolean" },
+        "authProvider": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["id", "email", "fullName", "role", "status", "registrationDate"]
+    },
+    "FakeNewsReport": {
+      "title": "FakeNewsReport",
+      "description": "Rumor reports submitted by citizens and verified by admins.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "fake", "misleading", "verified"] },
+        "reason": { "type": "string" },
+        "explanation": { "type": "string" },
+        "date": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "upvotes": { "type": "number" },
+        "level": { "type": "string", "enum": ["bas", "moyen", "critique"] }
+      },
+      "required": ["id", "title", "category", "description", "status", "explanation", "date", "reporterName", "upvotes", "level"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Educational lesson module on fake news.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "duration": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["Débutant", "Intermédiaire", "Avancé"] },
+        "summary": { "type": "string" },
+        "pages": { "type": "array" },
+        "icon": { "type": "string" },
+        "publisher": { "type": "string" },
+        "publishedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "duration", "difficulty", "summary", "pages", "icon"]
+    },
+    "MediaSubmission": {
+      "title": "MediaSubmission",
+      "description": "Submission from a user requesting to be certified as a media publisher.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mediaName": { "type": "string" },
+        "email": { "type": "string" },
+        "websiteUrl": { "type": "string" },
+        "haacRegNumber": { "type": "string" },
+        "category": { "type": "string", "enum": ["presse-ecrite", "presse-en-ligne", "audiovisuel", "autre"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "submittedAt": { "type": "string" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["id", "mediaName", "email", "websiteUrl", "haacRegNumber", "category", "status", "submittedAt"]
+    },
+    "Communique": {
+      "title": "Communique",
+      "description": "Official public announcements or press releases displayed on a scrolling banner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "content", "active", "createdAt"]
+    },
+    "Advertisement": {
+      "title": "Advertisement",
+      "description": "Image and video advertisements managed by administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video"] },
+        "mediaUrl": { "type": "string" },
+        "targetUrl": { "type": "string" },
+        "placement": { "type": "string", "enum": ["header", "sidebar", "footer"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "type", "mediaUrl", "targetUrl", "placement", "active", "createdAt"]
+    },
+    "Frontpage": {
+      "title": "Frontpage",
+      "description": "Daily press frontpage / UNE published by media partners or admins.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mediaName": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "publishedBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["mediaName", "imageUrl", "date", "publishedBy", "createdAt"]
+    },
+    "NewsletterSubscription": {
+      "title": "NewsletterSubscription",
+      "description": "Newsletter subscription details for users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userFullName": { "type": "string" },
+        "mediaChoice": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "userEmail", "userFullName", "mediaChoice", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User accounts and permissions."
+    },
+    "rumeurs/{reportId}": {
+      "schema": { "$ref": "#/entities/FakeNewsReport" },
+      "description": "User reported rumors and their status."
+    },
+    "lessons/{lessonId}": {
+      "schema": { "$ref": "#/entities/Lesson" },
+      "description": "Interactive courses published by media and admin."
+    },
+    "submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/MediaSubmission" },
+      "description": "Requests from simple users to become official media publishers."
+    },
+    "communiques/{communiqueId}": {
+      "schema": { "$ref": "#/entities/Communique" },
+      "description": "Official press releases displayed across the platform."
+    },
+    "advertisements/{adId}": {
+      "schema": { "$ref": "#/entities/Advertisement" },
+      "description": "Visual or video advertisements shown in various slots of the platform."
+    },
+    "frontpages/{frontpageId}": {
+      "schema": { "$ref": "#/entities/Frontpage" },
+      "description": "Daily press frontpage / UNE published by media partners or admins."
+    },
+    "newsletter_subscriptions/{subscriptionId}": {
+      "schema": { "$ref": "#/entities/NewsletterSubscription" },
+      "description": "Newsletter subscriptions for receiving media publications."
+    }
+  }
+}
