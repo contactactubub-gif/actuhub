@@ -4,6 +4,21 @@ import { Advertisement } from '../types';
 
 export const DEFAULT_CNIN_BENIN_ADS: Advertisement[] = [
   {
+    id: 'cnin-fly0',
+    title: 'CNIN BÉNIN - Campagne Nationale de Sensibilisation & Protection Numérique',
+    type: 'image',
+    mediaUrl: '/fly0.jpg',
+    targetUrl: 'https://www.cnin.bj',
+    placement: 'sidebar',
+    placements: ['sidebar', 'in_feed', 'footer', 'inline', 'popup'],
+    label: 'annonce',
+    advertiserName: 'CNIN BÉNIN',
+    active: true,
+    viewsCount: 0,
+    clicksCount: 0,
+    createdAt: new Date().toISOString()
+  },
+  {
     id: 'cnin-fly1',
     title: 'CNIN BÉNIN - Protection des Données Personnelles',
     type: 'image',
