@@ -270,7 +270,7 @@ export const AdCarousel: React.FC<AdCarouselProps> = ({
             <span>/</span>
             <span>{displayAds.length}</span>
             <span className="text-[9px] text-slate-400 ml-1 font-sans">
-              {isPaused ? '(En pause)' : '• 3s'}
+              {isPaused ? '(En pause)' : `• ${Math.round(autoPlayInterval / 1000)}s`}
             </span>
           </div>
         </div>

@@ -690,12 +690,12 @@ export default function DisinformationAcademy({
         </div>
       </div>
 
-      {/* Carousel publicitaire défilable (3s) au-dessus du Test de Certification */}
+      {/* Carousel publicitaire défilable (4s) au-dessus du Test de Certification */}
       <AdCarousel
         advertisements={advertisements}
         onTrackView={onTrackView}
         onTrackClick={onTrackClick}
-        autoPlayInterval={3000}
+        autoPlayInterval={4000}
         className="my-6"
       />
 

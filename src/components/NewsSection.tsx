@@ -1481,7 +1481,7 @@ function NewsSection({
                 <AdCarousel 
                   advertisements={advertisements} 
                   placementFilter="sidebar" 
-                  autoPlayInterval={3000} 
+                  autoPlayInterval={4000} 
                   onTrackView={onTrackView} 
                   onTrackClick={onTrackClick} 
                 />
@@ -1801,13 +1801,13 @@ function NewsSection({
         </div>
       )}
 
-      {/* Carousel publicitaire défilable (3s) au-dessus des Recommandations IA */}
+      {/* Carousel publicitaire défilable (4s) au-dessus des Recommandations IA */}
       {searchQuery === '' && (
         <AdCarousel
           advertisements={advertisements}
           onTrackView={onTrackView}
           onTrackClick={onTrackClick}
-          autoPlayInterval={3000}
+          autoPlayInterval={4000}
           className="mb-6"
         />
       )}
@@ -2224,7 +2224,7 @@ function NewsSection({
                     <AdCarousel 
                       advertisements={advertisements} 
                       placementFilter="in_feed" 
-                      autoPlayInterval={3000} 
+                      autoPlayInterval={4000} 
                       onTrackView={onTrackView} 
                       onTrackClick={onTrackClick} 
                     />

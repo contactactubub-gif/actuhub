@@ -685,7 +685,7 @@ export default function App() {
         <AdCarousel 
           advertisements={advertisements} 
           placementFilter={placement} 
-          autoPlayInterval={3000} 
+          autoPlayInterval={4000} 
           onTrackView={handleTrackAdView} 
           onTrackClick={handleTrackAdClick} 
         />
