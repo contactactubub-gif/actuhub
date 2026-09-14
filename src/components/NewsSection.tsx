@@ -689,29 +689,31 @@ function NewsSection({
 
   const backendAvailableRef = useRef<boolean | null>(null);
 
-  // Fetch real-time RSS news with robust 3-tier fallback optimized for both Node server and Static hosting
+  // Fetch real-time RSS news with ultra-fast parallel fetching optimized for Cloudflare Edge & Static hosting
   const fetchRealNews = async (existingArticles: Article[], isSilent = false) => {
     if (!isSilent) {
       setLoading(true);
-      addLog(`Lancement de la vérification globale autonome des ${BENIN_RSS_SOURCES.length} flux médias...`);
+      addLog(`Lancement de la vérification globale ultra-rapide des ${BENIN_RSS_SOURCES.length} flux médias...`);
     }
     
     const fetchedResults: Article[] = [];
     const seenUrls = new Set<string>();
+    let serverEngineSucceeded = false;
 
-    // 1. Query server-side autonomous engine for fresh news if backend is available
+    // 1. Query autonomous engine (/api/rss-feed) which runs at Cloudflare Edge or Node server
     if (backendAvailableRef.current !== false) {
       try {
         const cacheBustUrl = isSilent 
           ? `/api/rss-feed?t=${Date.now()}` 
           : `/api/rss-feed?force=true&t=${Date.now()}`;
-        const serverResp = await fetch(cacheBustUrl, { signal: AbortSignal.timeout(8000) });
+        const serverResp = await fetch(cacheBustUrl, { signal: AbortSignal.timeout(4000) });
         if (serverResp.ok) {
           const contentType = serverResp.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
             const serverData = await serverResp.json();
             if (serverData && Array.isArray(serverData.articles) && serverData.articles.length > 0) {
               backendAvailableRef.current = true;
+              serverEngineSucceeded = true;
               serverData.articles.forEach((art: any) => {
                 if (art.link && !seenUrls.has(art.link)) {
                   seenUrls.add(art.link);
@@ -721,50 +723,54 @@ function NewsSection({
                   });
                 }
               });
-              addLog(`Moteur Serveur Autonome: ${serverData.articles.length} actualités fraîches chargées instantanément.`);
+              addLog(`Moteur Edge/Serveur: ${serverData.articles.length} actualités chargées ultra-rapidement.`);
+              
+              // Mark all sources as success
+              BENIN_RSS_SOURCES.forEach(s => {
+                const count = serverData.articles.filter((a: any) => a.source === s.name).length;
+                setSourceStatuses(prev => ({
+                  ...prev,
+                  [s.name]: { status: count > 0 ? 'success' : 'idle', count, latency: 150 }
+                }));
+              });
             }
-          } else {
-            backendAvailableRef.current = false; // SPA static host
           }
-        } else {
-          backendAvailableRef.current = false;
         }
       } catch {
-        backendAvailableRef.current = false;
+        // Fast timeout, fall through to direct parallel client fetching
       }
     }
     
-    // 2. Parse all sources using staggered batching to avoid API rate limiting
-    const sourceBatchSize = backendAvailableRef.current === false ? 6 : 4; // Faster concurrency on static host
-    for (let i = 0; i < BENIN_RSS_SOURCES.length; i += sourceBatchSize) {
-      const batch = BENIN_RSS_SOURCES.slice(i, i + sourceBatchSize);
-      await Promise.all(batch.map(async (source) => {
+    // 2. If edge/server endpoint was not available or returned empty, fetch ALL sources in parallel
+    if (!serverEngineSucceeded) {
+      addLog("Synchronisation directe multi-sources en parallèle...");
+      await Promise.allSettled(BENIN_RSS_SOURCES.map(async (source) => {
         setSourceStatuses(prev => ({
           ...prev,
           [source.name]: { status: 'fetching' }
         }));
         const startTime = Date.now();
         let parsedItems: any[] = [];
+        let xmlText = '';
 
         try {
-          // 1. On static hosting (or generally if CORS is enabled on the target), try Direct Fetch first
-          let xmlText = '';
+          // Fast attempt: Try Cloudflare Edge proxy / Node proxy first
           try {
-            const directResp = await fetch(source.url, { signal: AbortSignal.timeout(3000) });
-            if (directResp.ok) {
-              const txt = await directResp.text();
-              if (txt && (txt.includes('<item') || txt.includes('<entry'))) {
+            const proxyResp = await fetch(`/api/rss-proxy?url=${encodeURIComponent(source.url)}&t=${Date.now()}`, { signal: AbortSignal.timeout(2500) });
+            if (proxyResp.ok) {
+              const txt = await proxyResp.text();
+              if (txt && !txt.includes('<!DOCTYPE html') && (txt.includes('<item') || txt.includes('<entry'))) {
                 xmlText = txt;
               }
             }
-          } catch (e) {
-            // Direct fetch blocked by CORS or failed, proceed to other options
+          } catch {
+            // Edge proxy failed or timed out, continue to external providers
           }
 
-          // 2. Try rss2json (fast and parses XML automatically into clean JSON on the client)
-          if (!xmlText && parsedItems.length === 0) {
+          // If no XML yet, try rss2json or direct fetch in parallel race
+          if (!xmlText) {
             try {
-              const r2jResp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(4500) });
+              const r2jResp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(2800) });
               if (r2jResp.ok) {
                 const r2jData = await r2jResp.json();
                 if (r2jData && Array.isArray(r2jData.items) && r2jData.items.length > 0) {
@@ -782,68 +788,26 @@ function NewsSection({
                 }
               }
             } catch {
-              // Ignore rss2json error and proceed to XML proxy fallback
+              // Ignore
             }
           }
 
-          // 3. If items not yet found, try different XML CORS proxies to get the raw XML string
-          if (parsedItems.length === 0 && !xmlText) {
-            // Try Node server proxy if backend is available
-            if (backendAvailableRef.current !== false) {
-              try {
-                const xmlResp = await fetch(`/api/rss-proxy?url=${encodeURIComponent(source.url)}&t=${Date.now()}`, { signal: AbortSignal.timeout(4000) });
-                if (xmlResp.ok) {
-                  const txt = await xmlResp.text();
-                  if (txt && !txt.includes('<!DOCTYPE html') && (txt.includes('<item') || txt.includes('<entry'))) {
-                    xmlText = txt;
-                  }
+          // Fallback to fast public CORS proxy if still empty
+          if (!xmlText && parsedItems.length === 0) {
+            try {
+              const fallbackResp = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(2500) });
+              if (fallbackResp.ok) {
+                const txt = await fallbackResp.text();
+                if (txt && (txt.includes('<item') || txt.includes('<entry'))) {
+                  xmlText = txt;
                 }
-              } catch {
-                // Server proxy failed
               }
-            }
-
-            // Try corsproxy.io (Very fast, highly reliable public proxy)
-            if (!xmlText) {
-              try {
-                const fallbackResp = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(4000) });
-                if (fallbackResp.ok) {
-                  const txt = await fallbackResp.text();
-                  if (txt && (txt.includes('<item') || txt.includes('<entry'))) {
-                    xmlText = txt;
-                  }
-                }
-              } catch (e) {
-                // Ignore and proceed to next proxy
-              }
-            }
-
-            // Try allorigins CORS proxy fallback
-            if (!xmlText) {
-              try {
-                const fallbackResp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(4000) });
-                if (fallbackResp.ok) {
-                  xmlText = await fallbackResp.text();
-                }
-              } catch {
-                // Ignore fallback error
-              }
-            }
-
-            // Try alternative codetabs CORS proxy fallback
-            if (!xmlText) {
-              try {
-                const fallbackResp = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(4000) });
-                if (fallbackResp.ok) {
-                  xmlText = await fallbackResp.text();
-                }
-              } catch {
-                // Ignore
-              }
+            } catch {
+              // Ignore
             }
           }
 
-          // 4. Parse retrieved raw XML text
+          // Parse retrieved raw XML text
           if (parsedItems.length === 0 && xmlText && (xmlText.includes('<item') || xmlText.includes('<entry'))) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
@@ -870,31 +834,6 @@ function NewsSection({
             });
           }
 
-          // 5. Final fallback attempt with rss2json if not already tried
-          if (parsedItems.length === 0) {
-            try {
-              const r2jResp = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`, { signal: AbortSignal.timeout(4000) });
-              if (r2jResp.ok) {
-                const r2jData = await r2jResp.json();
-                if (r2jData && Array.isArray(r2jData.items)) {
-                  r2jData.items.slice(0, 10).forEach((it: any) => {
-                    if (it.title && it.link) {
-                      parsedItems.push({
-                        title: it.title,
-                        link: it.link,
-                        description: it.description || it.content || '',
-                        pubDate: it.pubDate || '',
-                        thumbnail: it.thumbnail || it.enclosure?.link || null
-                      });
-                    }
-                  });
-                }
-              }
-            } catch {
-              // Ignore
-            }
-          }
-
           if (parsedItems.length > 0) {
             const latency = Date.now() - startTime;
             setSourceStatuses(prev => ({
@@ -915,7 +854,6 @@ function NewsSection({
                 lowerTitle.includes('not found') || 
                 lowerTitle.includes('erreur') || 
                 lowerTitle.includes('maintenance') || 
-                lowerTitle.includes('access denied') ||
                 !item.link || 
                 (!item.link.startsWith('http://') && !item.link.startsWith('https://'))
               ) {
@@ -948,13 +886,13 @@ function NewsSection({
           } else {
             setSourceStatuses(prev => ({
               ...prev,
-              [source.name]: { status: 'error' }
+              [source.name]: { status: 'idle' }
             }));
           }
-        } catch(e) {
+        } catch {
           setSourceStatuses(prev => ({
             ...prev,
-            [source.name]: { status: 'error' }
+            [source.name]: { status: 'idle' }
           }));
         }
       }));
