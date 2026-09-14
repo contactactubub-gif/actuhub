@@ -116,7 +116,7 @@ interface AdCarouselProps {
   onTrackClick?: (adId: string) => void;
   placementFilter?: string;
   className?: string;
-  autoPlayInterval?: number; // in milliseconds, default 3000ms (3 seconds)
+  autoPlayInterval?: number; // in milliseconds, default 4000ms (4 seconds)
 }
 
 export const AdCarousel: React.FC<AdCarouselProps> = ({
@@ -125,7 +125,7 @@ export const AdCarousel: React.FC<AdCarouselProps> = ({
   onTrackClick,
   placementFilter,
   className = '',
-  autoPlayInterval = 3000 // 3 seconds per user request
+  autoPlayInterval = 4000 // 4 seconds per user request
 }) => {
   // Combine passed advertisements with default CNIN BENIN campaign slides if needed
   const combinedAds = advertisements && advertisements.length > 0

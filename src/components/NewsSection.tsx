@@ -580,7 +580,7 @@ function NewsSection({
       if (heroArticles.length > 0) {
         setHeroIndex(prev => (prev + 1) % heroArticles.length);
       }
-    }, 6000);
+    }, 4000);
   };
 
   const stopHeroAutoplay = () => {
